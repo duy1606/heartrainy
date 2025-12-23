@@ -28,7 +28,7 @@ const NAME_TEXT = "DUYÊN";
 const RAIN_TIME = 2000;
 const NAME_TIME = 4000;
 const IS_MOBILE = innerWidth < 768;
-const TOTAL_HEARTS = IS_MOBILE ? 550 : 1400;
+const TOTAL_HEARTS = IS_MOBILE ? 850 : 1400;
 
 /* ================= CANVAS ================= */
 const canvas = document.getElementById("canvas");
@@ -77,49 +77,39 @@ for(let i=0;i<TOTAL_HEARTS;i++){
   });
 }
 
-/* ================= BUILD NAME ================= */
+/* ================= BUILD NAME (XẾP NGANG CHO CẢ MOBILE) ================= */
 function buildNameTargets(text){
   off.width = innerWidth;
   off.height = innerHeight;
   offCtx.clearRect(0,0,off.width,off.height);
 
   const fs = IS_MOBILE
-    ? Math.min(innerWidth*0.15, innerHeight*0.17)
-    : Math.min(innerWidth*0.18, innerHeight*0.22);
+    ? Math.min(innerWidth * 0.14, innerHeight * 0.14)
+    : Math.min(innerWidth * 0.18, innerHeight * 0.22);
 
   offCtx.font = `900 ${fs}px Arial`;
   offCtx.textBaseline="middle";
-  offCtx.textAlign="center";
+  offCtx.textAlign="left";
 
   targets=[];
 
-  if(IS_MOBILE){
-    let y = off.height/2 - (text.length * fs * 1.25) / 2;
-    for(let i=0;i<text.length;i++){
-      offCtx.clearRect(0,0,off.width,off.height);
-      offCtx.fillText(text[i], off.width/2, y);
-      grab();
-      y += fs * 1.25; // giãn dòng mobile
-    }
-  }else{
-    let total=0;
-    for(const c of text) total+=offCtx.measureText(c).width;
-    let x=off.width/2-total/2;
-    const y=off.height/2;
+  let total = 0;
+  for(const c of text) total += offCtx.measureText(c).width;
 
-    offCtx.textAlign="left";
-    for(let i=0;i<text.length;i++){
-      offCtx.clearRect(0,0,off.width,off.height);
-      offCtx.fillText(text[i],x,y);
-      grab();
-      x+=offCtx.measureText(text[i]).width;
-    }
+  let x = off.width/2 - total/2;
+  const y = off.height/2;
+
+  for(let i=0;i<text.length;i++){
+    offCtx.clearRect(0,0,off.width,off.height);
+    offCtx.fillText(text[i], x, y);
+    grab();
+    x += offCtx.measureText(text[i]).width;
   }
 }
 
 function grab(){
   const step = IS_MOBILE ? 6 : 5;
-  const d=offCtx.getImageData(0,0,off.width,off.height).data;
+  const d = offCtx.getImageData(0,0,off.width,off.height).data;
   for(let y=0;y<off.height;y+=step){
     for(let x=0;x<off.width;x+=step){
       if(d[(y*off.width+x)*4+3]>20){
@@ -127,6 +117,37 @@ function grab(){
       }
     }
   }
+}
+
+/* ================= EMOJI ORBIT ================= */
+let emojiAngle = 0;
+const emojiList = ["💖","💕","💗"];
+
+function drawEmojiOrbit(){
+  const cx = innerWidth/2;
+  const cy = innerHeight/2;
+
+  const radius = IS_MOBILE
+    ? Math.min(innerWidth,innerHeight) * 0.28
+    : Math.min(innerWidth,innerHeight) * 0.34;
+
+  ctx.font = IS_MOBILE ? "18px serif" : "20px serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  const icon = emojiList[Math.floor(Date.now()/800)%emojiList.length];
+  const count = IS_MOBILE ? 10 : 12;
+
+  for(let i=0;i<count;i++){
+    const a = emojiAngle + (Math.PI*2/count)*i;
+    ctx.fillText(
+      icon,
+      cx + Math.cos(a)*radius,
+      cy + Math.sin(a)*radius
+    );
+  }
+
+  emojiAngle += IS_MOBILE ? 0.006 : 0.008;
 }
 
 /* ================= STATE ================= */
@@ -153,29 +174,6 @@ function switchState(next){
   }
 }
 
-/* ================= LOVE ORBIT ================= */
-let loveAngle=0;
-const loveIcons=["💖","💕","💗"];
-
-function drawLoveOrbit(){
-  if(IS_MOBILE) return; // mobile: bỏ cho gọn
-
-  const cx=innerWidth/2;
-  const cy=innerHeight/2;
-  const r=Math.min(innerWidth,innerHeight)*0.32;
-
-  ctx.font="18px serif";
-  ctx.textAlign="center";
-  ctx.textBaseline="middle";
-
-  const icon=loveIcons[Math.floor(Date.now()/700)%loveIcons.length];
-  for(let i=0;i<12;i++){
-    const a=loveAngle+(Math.PI*2/12)*i;
-    ctx.fillText(icon,cx+Math.cos(a)*r,cy+Math.sin(a)*r);
-  }
-  loveAngle+=0.008;
-}
-
 /* ================= LOOP ================= */
 function animate(now){
   const e=now-stateTime;
@@ -192,7 +190,10 @@ function animate(now){
   ctx.fillStyle = state==="name" ? "#ffe6ef" : "#ffffff";
   ctx.fillRect(0,0,innerWidth,innerHeight);
 
-  if(state==="name") drawLoveOrbit();
+  /* ===== EMOJI ORBIT (CHỈ KHI NAME) ===== */
+  if(state==="name"){
+    drawEmojiOrbit();
+  }
 
   for(const h of hearts){
     if(state==="name"){
