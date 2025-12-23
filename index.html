@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Heart Rain → Name</title>
+
+<style>
+html,body{
+  margin:0;
+  padding:0;
+  overflow:hidden;
+  background:#fff;
+}
+canvas{
+  position:fixed;
+  inset:0;
+}
+</style>
+</head>
+
+<body>
+<canvas id="canvas"></canvas>
+
+<script>
+/* ================= CONFIG ================= */
+const NAME_TEXT = "DUYÊN";
+const RAIN_TIME = 2000;
+const NAME_TIME = 4000;
+const IS_MOBILE = innerWidth < 768;
+const TOTAL_HEARTS = IS_MOBILE ? 550 : 1400;
+
+/* ================= CANVAS ================= */
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+const DPR = Math.min(devicePixelRatio||1,2);
+
+/* ================= OFFSCREEN ================= */
+const off = document.createElement("canvas");
+const offCtx = off.getContext("2d",{willReadFrequently:true});
+let targets=[];
+
+function resize(){
+  canvas.width = innerWidth * DPR;
+  canvas.height = innerHeight * DPR;
+  canvas.style.width = innerWidth+"px";
+  canvas.style.height = innerHeight+"px";
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+}
+resize();
+addEventListener("resize",resize);
+
+const rand=(a,b)=>Math.random()*(b-a)+a;
+
+/* ================= DRAW HEART ================= */
+function drawHeart(x,y,s,c){
+  ctx.fillStyle=c;
+  ctx.beginPath();
+  ctx.moveTo(x,y+s/4);
+  ctx.bezierCurveTo(x+s,y-s/2,x+s*1.4,y+s/3,x,y+s);
+  ctx.bezierCurveTo(x-s*1.4,y+s/3,x-s,y-s/2,x,y+s/4);
+  ctx.fill();
+}
+
+/* ================= HEART DATA ================= */
+const hearts=[];
+for(let i=0;i<TOTAL_HEARTS;i++){
+  hearts.push({
+    x:rand(0,innerWidth),
+    y:rand(-innerHeight,innerHeight),
+    vx:0,
+    vy:rand(28,65),
+    size:rand(IS_MOBILE?3:4, IS_MOBILE?5:6),
+    color:`hsl(${rand(330,360)},75%,60%)`,
+    tx:0,
+    ty:0
+  });
+}
+
+/* ================= BUILD NAME ================= */
+function buildNameTargets(text){
+  off.width = innerWidth;
+  off.height = innerHeight;
+  offCtx.clearRect(0,0,off.width,off.height);
+
+  const fs = IS_MOBILE
+    ? Math.min(innerWidth*0.15, innerHeight*0.17)
+    : Math.min(innerWidth*0.18, innerHeight*0.22);
+
+  offCtx.font = `900 ${fs}px Arial`;
+  offCtx.textBaseline="middle";
+  offCtx.textAlign="center";
+
+  targets=[];
+
+  if(IS_MOBILE){
+    let y = off.height/2 - (text.length * fs * 1.25) / 2;
+    for(let i=0;i<text.length;i++){
+      offCtx.clearRect(0,0,off.width,off.height);
+      offCtx.fillText(text[i], off.width/2, y);
+      grab();
+      y += fs * 1.25; // giãn dòng mobile
+    }
+  }else{
+    let total=0;
+    for(const c of text) total+=offCtx.measureText(c).width;
+    let x=off.width/2-total/2;
+    const y=off.height/2;
+
+    offCtx.textAlign="left";
+    for(let i=0;i<text.length;i++){
+      offCtx.clearRect(0,0,off.width,off.height);
+      offCtx.fillText(text[i],x,y);
+      grab();
+      x+=offCtx.measureText(text[i]).width;
+    }
+  }
+}
+
+function grab(){
+  const step = IS_MOBILE ? 6 : 5;
+  const d=offCtx.getImageData(0,0,off.width,off.height).data;
+  for(let y=0;y<off.height;y+=step){
+    for(let x=0;x<off.width;x+=step){
+      if(d[(y*off.width+x)*4+3]>20){
+        targets.push({x,y});
+      }
+    }
+  }
+}
+
+/* ================= STATE ================= */
+let state="rain";
+let stateTime=performance.now();
+
+function switchState(next){
+  state=next;
+  stateTime=performance.now();
+
+  if(state==="rain"){
+    for(const h of hearts){
+      h.vx=0;
+      h.vy=rand(28,65);
+    }
+  }
+
+  if(state==="name"){
+    for(const h of hearts){
+      const p = targets[(Math.random()*targets.length)|0];
+      h.tx=p.x;
+      h.ty=p.y;
+    }
+  }
+}
+
+/* ================= LOVE ORBIT ================= */
+let loveAngle=0;
+const loveIcons=["💖","💕","💗"];
+
+function drawLoveOrbit(){
+  if(IS_MOBILE) return; // mobile: bỏ cho gọn
+
+  const cx=innerWidth/2;
+  const cy=innerHeight/2;
+  const r=Math.min(innerWidth,innerHeight)*0.32;
+
+  ctx.font="18px serif";
+  ctx.textAlign="center";
+  ctx.textBaseline="middle";
+
+  const icon=loveIcons[Math.floor(Date.now()/700)%loveIcons.length];
+  for(let i=0;i<12;i++){
+    const a=loveAngle+(Math.PI*2/12)*i;
+    ctx.fillText(icon,cx+Math.cos(a)*r,cy+Math.sin(a)*r);
+  }
+  loveAngle+=0.008;
+}
+
+/* ================= LOOP ================= */
+function animate(now){
+  const e=now-stateTime;
+
+  if(state==="rain" && e>RAIN_TIME){
+    buildNameTargets(NAME_TEXT);
+    switchState("name");
+  }
+
+  if(state==="name" && e>NAME_TIME){
+    switchState("rain");
+  }
+
+  ctx.fillStyle = state==="name" ? "#ffe6ef" : "#ffffff";
+  ctx.fillRect(0,0,innerWidth,innerHeight);
+
+  if(state==="name") drawLoveOrbit();
+
+  for(const h of hearts){
+    if(state==="name"){
+      h.vx+=(h.tx-h.x)*0.05;
+      h.vy+=(h.ty-h.y)*0.05;
+      h.vx*=0.82;
+      h.vy*=0.82;
+      h.x+=h.vx;
+      h.y+=h.vy;
+    }else{
+      h.y+=h.vy*0.016;
+      if(h.y>innerHeight){
+        h.y=-20;
+        h.x=rand(0,innerWidth);
+      }
+    }
+    drawHeart(h.x,h.y,h.size,h.color);
+  }
+
+  requestAnimationFrame(animate);
+}
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>
